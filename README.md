@@ -183,3 +183,10 @@ MIT License
 *Proving that legacy hardware can run cutting-edge AI*
 
 </div>
+
+
+## 中文简介
+
+Elyan Labs POWER8/PowerPC 项目 - 为 IBM POWER 系统和复古 Mac 提供现代 AI 支持。
+
+Contributed by eelaine-wzw
