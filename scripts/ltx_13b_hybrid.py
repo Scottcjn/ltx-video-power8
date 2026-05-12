@@ -29,6 +29,8 @@ from diffusers import AutoencoderKLLTXVideo, LTXVideoTransformer3DModel
 from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
 from transformers import T5EncoderModel, T5Tokenizer
 
+from ltx_latent_utils import map_key, pack_latents, unpack_latents
+
 print("=" * 60)
 print("LTX-Video 13B POWER8 - HYBRID Threading")
 print("=" * 60)
@@ -43,54 +45,6 @@ PATCH_SIZE = 1
 PATCH_SIZE_T = 1
 
 TRANSFORMER_THREADS = 32  # Reduced for OpenBLAS stability
-
-def pack_latents(latents, patch_size=1, patch_size_t=1):
-    batch_size, num_channels, num_frames, height, width = latents.shape
-    post_patch_num_frames = num_frames // patch_size_t
-    post_patch_height = height // patch_size
-    post_patch_width = width // patch_size
-    
-    latents = latents.reshape(
-        batch_size, num_channels,
-        post_patch_num_frames, patch_size_t,
-        post_patch_height, patch_size,
-        post_patch_width, patch_size,
-    )
-    latents = latents.permute(0, 2, 4, 6, 1, 3, 5, 7)
-    latents = latents.reshape(
-        batch_size,
-        post_patch_num_frames * post_patch_height * post_patch_width,
-        num_channels * patch_size_t * patch_size * patch_size,
-    )
-    return latents
-
-def unpack_latents(latents, num_frames, height, width, patch_size=1, patch_size_t=1, out_channels=128):
-    batch_size = latents.shape[0]
-    post_patch_num_frames = num_frames // patch_size_t
-    post_patch_height = height // patch_size
-    post_patch_width = width // patch_size
-    
-    latents = latents.reshape(
-        batch_size,
-        post_patch_num_frames, post_patch_height, post_patch_width,
-        out_channels, patch_size_t, patch_size, patch_size,
-    )
-    latents = latents.permute(0, 4, 1, 5, 2, 6, 3, 7)
-    latents = latents.reshape(batch_size, out_channels, num_frames, height, width)
-    return latents
-
-def map_key(key):
-    k = key.replace("model.diffusion_model.", "")
-    mappings = [
-        ("patchify_proj.", "proj_in."),
-        (".q_norm.", ".norm_q."),
-        (".k_norm.", ".norm_k."),
-        ("adaln_single.emb.timestep_embedder.", "time_embed.emb.timestep_embedder."),
-        ("adaln_single.linear.", "time_embed.linear."),
-    ]
-    for old, new in mappings:
-        k = k.replace(old, new)
-    return k
 
 def load_and_map_weights(model, checkpoint_path):
     with safe_open(checkpoint_path, framework="pt") as f:
